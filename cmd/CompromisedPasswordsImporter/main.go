@@ -4,15 +4,19 @@ import (
 	"flag"
 	"fmt"
 	"github.com/avast/retry-go"
+	"github.com/schollz/progressbar/v3"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
+
+const HIBPPrefixesCount = 1 << 20
 
 type CompromisedPasswordsDownloader struct {
 	client *http.Client
@@ -26,33 +30,29 @@ func main() {
 	flag.Parse()
 
 	if *mode == "URL" {
-
+		var cpd CompromisedPasswordsDownloader
+		cpd.url = *source
+		cpd.client = &http.Client{}
+		err := cpd.downloadAllPrefixes()
+		if err != nil {
+			fmt.Printf("Error downloading prefixes: %v\n", err)
+		}
 	}
 	fmt.Println("Username:", *mode)
 	fmt.Println("Username:", *source)
-	var cpd CompromisedPasswordsDownloader
-	cpd.url = *source
-	cpd.client = &http.Client{}
-	err := cpd.downloadAllPrefixes()
-	if err != nil {
-		fmt.Printf("Error downloading prefixes: %v\n", err)
-	}
 
-}
-
-func (downloader *CompromisedPasswordsDownloader) updateValues() error {
-	return nil
 }
 
 func (downloader *CompromisedPasswordsDownloader) downloadAllPrefixes() error {
 	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 64)
+	semaphore := make(chan struct{}, min(runtime.NumCPU()*8, 64))
+	bar := progressbar.Default(HIBPPrefixesCount)
 
 	// Use a channel to communicate errors from goroutines
-	errCh := make(chan error, (1 << 20))
+	errCh := make(chan error, (HIBPPrefixesCount))
 
 	// Iterate from 0 to 2^20 - 1
-	for i := 0; i < (1 << 20); i++ {
+	for i := 0; i < (HIBPPrefixesCount); i++ {
 		wg.Add(1)
 		semaphore <- struct{}{} // Acquire semaphore
 		go func(prefix int) {
@@ -65,6 +65,7 @@ func (downloader *CompromisedPasswordsDownloader) downloadAllPrefixes() error {
 				fmt.Printf("Error downloading for prefix %d: %v\n", prefix, err)
 				errCh <- err
 			}
+			bar.Add(1)
 		}(i)
 	}
 
