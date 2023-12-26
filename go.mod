@@ -1,4 +1,7 @@
-module cmd/CompromisedPasswordsImporter
-module cmd/PasswordCompromiseCheckServer
+module CompromisedPasswordsImporter
 
-go 1.21.5
+require (
+	github.com/avast/retry-go v3.0.0+incompatible
+)
+
+go 1.21
