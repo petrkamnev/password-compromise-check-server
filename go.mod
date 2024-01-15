@@ -1,4 +1,4 @@
-module CompromisedPasswordsImporter
+module PasswordCompromiseCheckProject
 
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
