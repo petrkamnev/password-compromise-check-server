@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	psi_server "github.com/openmined/psi/server"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	psi_server "github.com/openmined/psi/server"
 )
 
 var storagePath = "./storage"
@@ -179,10 +180,10 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 
 		server, err := psi_server.CreateWithNewKey(false)
 		if err != nil {
-			t.Errorf("Failed to create a PSI server %v", err)
+			fmt.Errorf("Failed to create a PSI server %v", err)
 		}
+		server.Destroy()
 		// Set the response code to 200
 		w.WriteHeader(http.StatusOK)
-
 	}
 }
