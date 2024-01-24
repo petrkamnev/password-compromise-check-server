@@ -3,12 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	psi_ds "github.com/openmined/psi/datastructure"
+	psi_proto "github.com/openmined/psi/pb"
 	psi_server "github.com/openmined/psi/server"
+	"google.golang.org/protobuf/proto"
 )
 
 var storagePath = "./storage"
@@ -129,6 +133,19 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 		// Construct the filename based on the given prefix
 		filename := "./storage/" + prefix + ".txt"
 
+		// Read the request body
+		requestBody, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Error reading request body", http.StatusInternalServerError)
+			return
+		}
+
+		psiRequest := &psi_proto.Request{}
+		err = proto.Unmarshal(requestBody, psiRequest)
+		if err != nil {
+			fmt.Errorf("Failed to deserialize request: %v", err)
+		}
+
 		// Check if the file exists
 		_, err := os.Stat(filename)
 		if os.IsNotExist(err) {
@@ -182,7 +199,33 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Errorf("Failed to create a PSI server %v", err)
 		}
-		server.Destroy()
+
+		// Create the setup
+		serverSetup, err := server.CreateSetupMessage(0, 1, values, psi_ds.Raw)
+		if err != nil {
+			fmt.Errorf("Failed to create serverSetup: %v", err)
+		}
+		serializedServerSetup, err := proto.Marshal(serverSetup)
+		if err != nil {
+			fmt.Errorf("Failed to serialize serverSetup: %v", err)
+		}
+
+		// Get the response
+		response, err := server.ProcessRequest(psiRequest)
+		if err != nil {
+			fmt.Errorf("Failed to process request: %v", err)
+		}
+		serializedResponse, err := proto.Marshal(response)
+		if err != nil {
+			fmt.Errorf("Failed to serialize response: %v", err)
+		}
+
+		// Send the serialized response back to the client
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("PSI-Response-Length", fmt.Sprint(len(serializedResponse)))
+		w.Header().Set("PSI-Setup-Length", fmt.Sprint(len(serializedServerSetup)))
+		w.Write(serializedResponse)
+		w.Write(serializedServerSetup)
 		// Set the response code to 200
 		w.WriteHeader(http.StatusOK)
 	}
