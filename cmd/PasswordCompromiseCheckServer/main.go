@@ -195,7 +195,7 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		server, err := psi_server.CreateWithNewKey(false)
+		server, err := psi_server.CreateWithNewKey(true)
 		if err != nil {
 			fmt.Errorf("Failed to create a PSI server %v", err)
 		}
