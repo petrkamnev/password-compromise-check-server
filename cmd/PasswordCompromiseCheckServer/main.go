@@ -147,7 +147,7 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Check if the file exists
-		_, err := os.Stat(filename)
+		_, err = os.Stat(filename)
 		if os.IsNotExist(err) {
 			// If the file doesn't exist, set the response code to 400 and write the error message to the response body
 			w.WriteHeader(http.StatusBadRequest)

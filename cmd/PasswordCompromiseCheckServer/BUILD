@@ -5,8 +5,11 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/openmined/psi",
     deps = [
+            "@org_golang_google_protobuf//proto:go_default_library",
             "@org_openmined_psi//private_set_intersection/go/server",
             "@org_openmined_psi//private_set_intersection/go/client",
+            "@org_openmined_psi//private_set_intersection/go/datastructure",
+            "@org_openmined_psi//private_set_intersection/proto:psi_go_proto",
             ],
 )
 
@@ -15,4 +18,7 @@ go_binary(
     out = "PasswordCompromiseCheckServer",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@org_golang_google_protobuf//proto:go_default_library",
+    ]
 )
