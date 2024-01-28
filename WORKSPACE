@@ -27,8 +27,6 @@ go_dependencies()
 
 go_rules_dependencies()
 
-gazelle_dependencies(go_repository_default_config = "//:WORKSPACE.bazel")
-
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
@@ -70,3 +68,5 @@ npm_install(
 load("@emsdk//:emscripten_deps.bzl", emsdk_emscripten_deps = "emscripten_deps")
 
 emsdk_emscripten_deps()
+
+gazelle_dependencies()
