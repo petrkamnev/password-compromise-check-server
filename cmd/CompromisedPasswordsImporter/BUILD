@@ -27,6 +27,7 @@ go_library(
 
 go_binary(
     name = "CompromisedPasswordsImporter",
+    out = "CompromisedPasswordsImporter",
     embed = [":CompromisedPasswordsImporter_lib"],
     visibility = ["//visibility:public"],
 )
