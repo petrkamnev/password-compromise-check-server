@@ -20,5 +20,5 @@ go_binary(
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//proto:go_default_library",
-    ]
+    ],
 )

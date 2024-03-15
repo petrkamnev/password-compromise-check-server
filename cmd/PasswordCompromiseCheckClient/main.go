@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"net/http"
 	"strconv"
@@ -15,8 +16,6 @@ import (
 	psi_proto "github.com/openmined/psi/pb"
 	"google.golang.org/protobuf/proto"
 )
-
-var storagePath = "./storage"
 
 func main() {
 	mode := flag.String("mode", "SHA-1", "The mode of the server (\"SHA-1\", \"NTLM\", \"PSI\")")
@@ -35,7 +34,7 @@ func main() {
 
 		// Extract prefix and suffix
 		prefix := hashString[:5]
-		suffix := hashString[5:]
+		suffix := strings.ToUpper(hashString[5:])
 		client, err := psi_client.CreateWithNewKey(true)
 		if err != nil {
 			fmt.Errorf("Failed to create a PSI client %v", err)
