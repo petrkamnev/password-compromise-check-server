@@ -22,7 +22,35 @@ func main() {
 	password := flag.String("password", "", "The password to check")
 	url := flag.String("url", "", "The password compromise check server url")
 	flag.Parse()
-	if *mode == "SHA-1" || *mode == "NTLM" {
+	if *mode == "SHA-1" {
+		hash := sha1.New()
+		hash.Write([]byte(*password))
+		hashBytes := hash.Sum(nil)
+
+		// Convert hash to hexadecimal string
+		hashString := hex.EncodeToString(hashBytes)
+
+		// Extract prefix and suffix
+		prefix := hashString[:5]
+		suffix := strings.ToUpper(hashString[5:])
+		response, err := http.Get(*url + "/range/" + prefix)
+		if err != nil {
+			fmt.Println("Error sending data to server:", err)
+			return
+		}
+		defer response.Body.Close()
+
+		// Read the response body
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			fmt.Println("Error reading response body:", err)
+			return
+		}
+
+		// Check if the response contains the suffix of the hash
+		fmt.Println(strings.Contains(string(body), suffix))
+
+	} else if *mode == "NTLM" {
 
 	} else if *mode == "PSI" {
 		hash := sha1.New()
@@ -52,7 +80,7 @@ func main() {
 
 		response, err := http.Post(*url+"/psi/"+prefix, "application/octet-stream", bytes.NewBuffer(serializedRequest))
 		if err != nil {
-			fmt.Println("Error sending YourMessage data to server:", err)
+			fmt.Println("Error sending data to server:", err)
 			return
 		}
 		// Read the response headers
@@ -89,7 +117,7 @@ func main() {
 		if err != nil {
 			fmt.Errorf("failed to compute intersection size %v", err)
 		}
-		fmt.Print(intersectionSize)
+		fmt.Println(intersectionSize != 0)
 
 	} else {
 		flag.Usage()
