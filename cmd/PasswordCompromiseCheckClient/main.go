@@ -1,35 +1,41 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/petrkamnev/password-compromise-check-server/pkg/PasswordCompromiseCheckClientLib"
 )
 
 func main() {
-	mode := flag.String("mode", "SHA-1", "The mode of the server (\"SHA-1\", \"NTLM\", \"PSI\")")
-	password := flag.String("password", "", "The password to check")
-	url := flag.String("url", "", "The password compromise check server url")
-	flag.Parse()
-	if *mode == "SHA-1" {
-		result, err := PasswordCompromiseCheckClientLib.CheckSHA1Password(*password, *url)
-		if err != nil {
-			fmt.Println("Error checking password:", err)
-			return
-		}
-		fmt.Println(result)
-	} else if *mode == "NTLM" {
-	} else if *mode == "PSI" {
-		result, err := PasswordCompromiseCheckClientLib.CheckSHA1PSIPassword(*password, *url)
-		if err != nil {
-			fmt.Println("Error checking password:", err)
-			return
-		}
-		fmt.Println(result)
-	} else {
-		flag.Usage()
-		return
-	}
+	serverURL := "http://localhost:8080"
+	for i := 0; i < 100; i++ {
+		password := generateRandomPassword()
 
+		if rand.Intn(2) == 0 {
+			_, err := PasswordCompromiseCheckClientLib.CheckSHA1Password(password, serverURL, i)
+			if err != nil {
+				fmt.Println("Error checking SHA1 password:", err)
+				continue
+			}
+		} else {
+			_, err := PasswordCompromiseCheckClientLib.CheckSHA1PSIPassword(password, serverURL, i)
+			if err != nil {
+				fmt.Println("Error checking SHA1 PSI password:", err)
+				continue
+			}
+		}
+	}
+}
+
+func generateRandomPassword() string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	passwordLength := 6
+	rand.Seed(time.Now().UnixNano())
+	b := make([]rune, passwordLength)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
