@@ -6,11 +6,14 @@ import (
 	"time"
 
 	"github.com/petrkamnev/password-compromise-check-server/pkg/PasswordCompromiseCheckClientLib"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 func main() {
 	serverURL := "http://localhost:8080"
-	for i := 0; i < 100; i++ {
+	bar := progressbar.Default(10001)
+	for i := 0; i < 10001; i++ {
 		password := generateRandomPassword()
 
 		if rand.Intn(2) == 0 {
@@ -26,6 +29,8 @@ func main() {
 				continue
 			}
 		}
+
+		bar.Add(1) // Increment the progress bar by 1 for each password processed
 	}
 }
 

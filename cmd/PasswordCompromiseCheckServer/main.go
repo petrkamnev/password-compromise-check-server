@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -18,6 +19,87 @@ import (
 
 var storagePath = "./storage"
 
+func performanceMetricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Measure before request processing
+		mBefore := &runtime.MemStats{}
+		runtime.ReadMemStats(mBefore)
+
+		// Wrap response writer for bandwidth calculation
+		lw := newLoggingResponseWriter(w)
+
+		// Process request
+		next(lw, r)
+
+		// Measure after request processing
+		mAfter := &runtime.MemStats{}
+		runtime.ReadMemStats(mAfter)
+		// Log metrics
+		mode := "sha1"
+		if !strings.Contains(r.URL.Path, "range") {
+			mode = "psi"
+		}
+		logPerformanceMetrics(mode, mBefore, mAfter, lw.size, r.URL.Query().Get("id"))
+	}
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	size int
+}
+
+func newLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
+	return &loggingResponseWriter{ResponseWriter: w}
+}
+
+func (lw *loggingResponseWriter) Write(data []byte) (int, error) {
+	size, err := lw.ResponseWriter.Write(data)
+	lw.size += size
+	return size, err
+}
+
+func logPerformanceMetrics(mode string, memBefore, memAfter *runtime.MemStats, responseSize int, id string) {
+	// Example: Log to a CSV file
+	if _, err := os.Stat("server_stats.csv"); os.IsNotExist(err) {
+		file, err := os.Create("server_stats.csv")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer file.Close()
+		writer := csv.NewWriter(file)
+		defer writer.Flush()
+		if err := writer.Write([]string{"id", "mem", "bnd", "mode"}); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+	file, err := os.OpenFile("server_stats.csv", os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// Calculate memory usage and execution time
+	memUsage := memAfter.Alloc - memBefore.Alloc
+
+	record := []string{
+		id,
+		fmt.Sprintf("%d", memUsage),
+		fmt.Sprintf("%d", responseSize),
+		mode,
+	}
+
+	if err := writer.Write(record); err != nil {
+		fmt.Println("Error writing to performance log file:", err)
+	}
+}
+
 func main() {
 	mode := flag.String("mode", "SHA-1", "The mode of the server (\"SHA-1\", \"NTLM\", \"PSI\")")
 	flag.Parse()
@@ -25,8 +107,8 @@ func main() {
 		http.HandleFunc("/range/", handleRange)
 		http.HandleFunc("/pwnedpassword/", handlePwnedPassword)
 	} else if *mode == "PSI" {
-		http.HandleFunc("/psi/", handlePSI)
-		http.HandleFunc("/range/", handleRange)
+		http.HandleFunc("/range/", performanceMetricsMiddleware(handleRange))
+		http.HandleFunc("/psi/", performanceMetricsMiddleware(handlePSI))
 	} else {
 		flag.Usage()
 		return
