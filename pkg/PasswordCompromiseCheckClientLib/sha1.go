@@ -28,7 +28,7 @@ func CheckSHA1Password(password string, url string, id int) (bool, error) {
 	prefix := hashString[:5]
 	suffix := strings.ToUpper(hashString[5:])
 	p1 := time.Now()
-	response, err := http.Get(url + "/range/" + prefix)
+	response, err := http.Get(url + "/range/" + prefix + "?id=" + strconv.Itoa(id))
 	p2 := time.Now()
 	if err != nil {
 		return false, err
@@ -95,7 +95,7 @@ func CheckSHA1PSIPassword(password string, url string, id int) (bool, error) {
 	}
 
 	p1 := time.Now()
-	response, err := http.Post(url+"/psi/"+prefix, "application/octet-stream", bytes.NewBuffer(serializedRequest))
+	response, err := http.Post(url+"/psi/"+prefix+"?id="+strconv.Itoa(id), "application/octet-stream", bytes.NewBuffer(serializedRequest))
 	p2 := time.Now()
 	if err != nil {
 		return false, fmt.Errorf("Error sending data to server: %v", err)

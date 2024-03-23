@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ func main() {
 		http.HandleFunc("/pwnedpassword/", handlePwnedPassword)
 	} else if *mode == "PSI" {
 		http.HandleFunc("/psi/", handlePSI)
+		http.HandleFunc("/range/", handleRange)
 	} else {
 		flag.Usage()
 		return
@@ -36,13 +38,15 @@ func main() {
 }
 
 func handleRange(w http.ResponseWriter, r *http.Request) {
+	p0 := time.Now()
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/range/"))
 	mode := r.URL.Query().Get("mode")
+	id := r.URL.Query().Get("id")
 	//addPadding := r.Header.Get("Add-Padding") == "true"
 	ifModifiedSince := r.Header.Get("If-Modified-Since")
 	if mode != "ntlm" {
 		// Construct the filename based on the given prefix
-		filename := "./storage/" + prefix + ".txt"
+		filename := "/tmp/pwned-storage/hashes-a/" + prefix + ".txt"
 
 		// Check if the file exists
 		_, err := os.Stat(filename)
@@ -52,7 +56,7 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("The hash prefix was not in a valid format"))
 			return
 		}
-
+		p1 := time.Now()
 		// Open the file
 		file, err := os.Open(filename)
 		if err != nil {
@@ -80,6 +84,7 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		fileSize := fileInfo.Size()
 		fileContent := make([]byte, fileSize)
 		_, err = file.Read(fileContent)
+		p2 := time.Now()
 		if err != nil {
 			// If there is an error reading the file, handle it (you may choose to log the error or handle it differently)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -95,6 +100,42 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 
 		// Write the file content to the response body
 		w.Write(fileContent)
+
+		p3 := time.Now()
+		if _, err := os.Stat("server_performance.csv"); os.IsNotExist(err) {
+			file, err := os.Create("server_performance.csv")
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			defer file.Close()
+			writer := csv.NewWriter(file)
+			defer writer.Flush()
+			if err := writer.Write([]string{"id", "p0p1", "p1p2", "p2p3", "mode"}); err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
+		file, err = os.OpenFile("server_performance.csv", os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer file.Close()
+		writer := csv.NewWriter(file)
+		p0p1 := p1.Sub(p0).Nanoseconds()
+		p1p2 := p2.Sub(p1).Nanoseconds()
+		p2p3 := p3.Sub(p2).Nanoseconds()
+
+		if err := writer.Write([]string{id, fmt.Sprintf("%d", p0p1), fmt.Sprintf("%d", p1p2), fmt.Sprintf("%d", p2p3), "sha1"}); err != nil {
+			fmt.Println(err)
+			return
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 }
 
@@ -127,11 +168,14 @@ func handlePwnedPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePSI(w http.ResponseWriter, r *http.Request) {
+
+	p0 := time.Now()
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/psi/"))
 	mode := r.URL.Query().Get("mode")
+	id := r.URL.Query().Get("id")
 	if mode != "ntlm" {
 		// Construct the filename based on the given prefix
-		filename := "./storage/" + prefix + ".txt"
+		filename := "/tmp/pwned-storage/hashes-a/" + prefix + ".txt"
 
 		// Read the request body
 		requestBody, err := io.ReadAll(r.Body)
@@ -155,8 +199,10 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		p1 := time.Now()
 		// Open the file
 		file, err := os.Open(filename)
+
 		if err != nil {
 			// If there is an error opening the file, handle it (you may choose to log the error or handle it differently)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -176,6 +222,8 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 		fileSize := fileInfo.Size()
 		fileContent := make([]byte, fileSize)
 		_, err = file.Read(fileContent)
+
+		p2 := time.Now()
 		if err != nil {
 			// If there is an error reading the file, handle it (you may choose to log the error or handle it differently)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -226,7 +274,41 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("PSI-Setup-Length", fmt.Sprint(len(serializedServerSetup)))
 		w.Write(serializedResponse)
 		w.Write(serializedServerSetup)
-		// Set the response code to 200
-		w.WriteHeader(http.StatusOK)
+
+		p3 := time.Now()
+		if _, err := os.Stat("client_performance.csv"); os.IsNotExist(err) {
+			file, err := os.Create("client_performance.csv")
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			defer file.Close()
+			writer := csv.NewWriter(file)
+			defer writer.Flush()
+			if err := writer.Write([]string{"id", "p0p1", "p1p2", "p2p3", "mode"}); err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
+		file, err = os.OpenFile("server_performance.csv", os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer file.Close()
+		writer := csv.NewWriter(file)
+		p0p1 := p1.Sub(p0).Nanoseconds()
+		p1p2 := p2.Sub(p1).Nanoseconds()
+		p2p3 := p3.Sub(p2).Nanoseconds()
+
+		if err := writer.Write([]string{id, fmt.Sprintf("%d", p0p1), fmt.Sprintf("%d", p1p2), fmt.Sprintf("%d", p2p3), "psi"}); err != nil {
+			fmt.Println(err)
+			return
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 }
