@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"runtime"
@@ -18,10 +20,40 @@ import (
 )
 
 var storagePath = "./storage"
+var psiServerInstance *psi_server.PsiServer
+
+// CalculateRequestSize estimates the size of the entire request (headers + body)
+func CalculateRequestSize(r *http.Request) int {
+	// Measure headers size
+	headerSize := 0
+	for name, values := range r.Header {
+		for _, value := range values {
+			// Header format: "Name: Value\r\n"
+			headerSize += len(name) + len(value) + 4 // +2 for ": ", +2 for CRLF
+		}
+	}
+
+	// Measure body size
+	bodyBytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		// handle error
+		fmt.Println("Error reading request body:", err)
+		return -1
+	}
+	// Restore the body so it can be read again later
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	bodySize := len(bodyBytes)
+
+	// Return total size (body + headers)
+	// Note: This does not include the request line size (e.g., "GET / HTTP/1.1\r\n"),
+	// which could be added separately if needed.
+	return headerSize + bodySize
+}
 
 func performanceMetricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		rSize := CalculateRequestSize(r)
 		// Measure before request processing
 		mBefore := &runtime.MemStats{}
 		runtime.ReadMemStats(mBefore)
@@ -40,7 +72,7 @@ func performanceMetricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if !strings.Contains(r.URL.Path, "range") {
 			mode = "psi"
 		}
-		logPerformanceMetrics(mode, mBefore, mAfter, lw.size, r.URL.Query().Get("id"))
+		logPerformanceMetrics(mode, mBefore, mAfter, lw.size+rSize, r.URL.Query().Get("id"))
 	}
 }
 
@@ -109,6 +141,12 @@ func main() {
 	} else if *mode == "PSI" {
 		http.HandleFunc("/range/", performanceMetricsMiddleware(handleRange))
 		http.HandleFunc("/psi/", performanceMetricsMiddleware(handlePSI))
+		server, err := psi_server.CreateWithNewKey(true)
+		if err != nil {
+			fmt.Printf("Failed to create a PSI server: %v\n", err)
+			return // Terminate the program if the server cannot be initialized
+		}
+		psiServerInstance = server // Assign the server instance to the global variable
 	} else {
 		flag.Usage()
 		return
@@ -325,13 +363,8 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		server, err := psi_server.CreateWithNewKey(true)
-		if err != nil {
-			fmt.Errorf("Failed to create a PSI server %v", err)
-		}
-
 		// Create the setup
-		serverSetup, err := server.CreateSetupMessage(0, 1, values, psi_ds.Raw)
+		serverSetup, err := psiServerInstance.CreateSetupMessage(0, 1, values, psi_ds.Raw)
 		if err != nil {
 			fmt.Errorf("Failed to create serverSetup: %v", err)
 		}
@@ -341,7 +374,7 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get the response
-		response, err := server.ProcessRequest(psiRequest)
+		response, err := psiServerInstance.ProcessRequest(psiRequest)
 		if err != nil {
 			fmt.Errorf("Failed to process request: %v", err)
 		}
