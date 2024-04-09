@@ -19,3 +19,12 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+func getStoragePath() string {
+	storagePath := os.Getenv("STORAGE_PATH")
+	if storagePath == "" {
+		// Default value if not set
+		storagePath = "./"
+	}
+	return storagePath
+}
