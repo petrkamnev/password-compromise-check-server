@@ -11,7 +11,7 @@ filegroup(
     srcs = [
         "//cmd/CompromisedPasswordsImporter",
         "//cmd/PasswordCompromiseCheckClient",
-        "//cmd/PasswordCompromiseCheckServer",
+        "//cmd/pccserver",
     ],
     visibility = ["//visibility:public"],
 )

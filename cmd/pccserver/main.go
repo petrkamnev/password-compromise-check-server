@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,21 +17,7 @@ import (
 var storagePath = "./storage"
 
 func main() {
-	mode := flag.String("mode", "SHA-1", "The mode of the server (\"SHA-1\", \"NTLM\", \"PSI\")")
-	flag.Parse()
-	if *mode == "SHA-1" || *mode == "NTLM" {
-		http.HandleFunc("/range/", handleRange)
-		http.HandleFunc("/pwnedpassword/", handlePwnedPassword)
-	} else if *mode == "PSI" {
-		http.HandleFunc("/psi/", handlePSI)
-	} else {
-		flag.Usage()
-		return
-	}
-
-	port := ":8080"
-	fmt.Printf("Server listening on port %s...\n", port)
-	http.ListenAndServe(port, nil)
+	Execute()
 }
 
 func handleRange(w http.ResponseWriter, r *http.Request) {
