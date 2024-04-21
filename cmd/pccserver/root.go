@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +32,13 @@ func Execute() {
 func getStoragePath() string {
 	storagePath := os.Getenv("STORAGE_PATH")
 	if storagePath == "" {
-		// Default value if not set
-		storagePath = "./storage/"
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			storagePath = "./storage/"
+		} else {
+			storagePath = filepath.Join(configDir, "pccserver", "storage")
+		}
 	}
+
 	return storagePath
 }

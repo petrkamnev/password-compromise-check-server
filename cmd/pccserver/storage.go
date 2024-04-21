@@ -32,7 +32,7 @@ var importCmd = &cobra.Command{
 		importFilePath, _ := cmd.Flags().GetString("file")
 		forceRewrite, _ := cmd.Flags().GetBool("force-rewrite")
 		//TODO: state checks (sha1, ntlm)
-		if *&importFilePath != "" {
+		if *&importFilePath == "" {
 			var cpd CompromisedPasswordsAPIImporter
 			cpd.url = url
 			cpd.client = &http.Client{}
@@ -42,15 +42,23 @@ var importCmd = &cobra.Command{
 			if err != nil {
 				fmt.Printf("Error downloading prefixes: %v\n", err)
 			}
+		} else {
+			var cpi CompromisedPasswordsFileImporter
+			cpi.filename = importFilePath
+			cpi.mode = hashFunction
+			err := cpi.importAllPrefixes()
+			if err != nil {
+				fmt.Printf("Error downloading prefixes: %v\n", err)
+			}
 		}
 	},
 }
 
 func initImportCmd() {
-	serverCmd.Flags().String("hash-function", "sha1", "Hash function for password checking: \"sha1\", \"ntlm\"")
-	serverCmd.Flags().StringP("url", "u", "https://api.pwnedpasswords.com/range/", "External password compromise checking API URL for import")
-	serverCmd.Flags().StringP("file", "f", "", "File with compromised password hashes for import. If this parameter is given, the \"url\" parameter is ignored")
-	serverCmd.Flags().Bool("force-rewrite", false, "Do not use caching headers for storage update optimization")
+	importCmd.Flags().String("hash-function", "sha1", "Hash function for password checking: \"sha1\", \"ntlm\"")
+	importCmd.Flags().StringP("url", "u", "https://api.pwnedpasswords.com/range/", "External password compromise checking API URL for import")
+	importCmd.Flags().StringP("file", "f", "", "File with compromised password hashes for import. If this parameter is given, the \"url\" parameter is ignored")
+	importCmd.Flags().Bool("force-rewrite", false, "Do not use caching headers for storage update optimization")
 }
 
 const HIBPPrefixesCount = 1 << 20
@@ -66,7 +74,10 @@ func (downloader *CompromisedPasswordsAPIImporter) downloadAllPrefixes() error {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, min(runtime.NumCPU()*8, 64))
 	bar := progressbar.Default(HIBPPrefixesCount)
-
+	directory := filepath.Join(getStoragePath(), downloader.mode)
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return fmt.Errorf("Failed to create directory: %v", err)
+	}
 	// Use a channel to communicate errors from goroutines
 	errCh := make(chan error, (HIBPPrefixesCount))
 
@@ -157,15 +168,18 @@ func (downloader *CompromisedPasswordsAPIImporter) downloadByPrefix(prefix int) 
 }
 
 type CompromisedPasswordsFileImporter struct {
-	filename     string
-	mode         string
-	forceRewrite bool
+	filename string
+	mode     string
 }
 
 func (importer *CompromisedPasswordsFileImporter) importAllPrefixes() error {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, min(runtime.NumCPU()*8, 64))
 	bar := progressbar.Default(HIBPPrefixesCount)
+	directory := filepath.Join(getStoragePath(), importer.mode)
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return fmt.Errorf("Failed to create directory: %v", err)
+	}
 
 	// Use a channel to communicate errors from goroutines
 	errCh := make(chan error, (HIBPPrefixesCount))
@@ -206,7 +220,6 @@ func (importer *CompromisedPasswordsFileImporter) importAllPrefixes() error {
 func (importer *CompromisedPasswordsFileImporter) importByPrefix(prefix int) error {
 	prefixHex := strings.ToUpper(fmt.Sprintf("%05x", prefix))
 	filename := filepath.Join(getStoragePath(), importer.mode+"/"+prefixHex+".txt")
-
 	data, err := importer.readDataForPrefix(prefixHex)
 	if err != nil {
 		return err
@@ -232,47 +245,59 @@ func (importer *CompromisedPasswordsFileImporter) importByPrefix(prefix int) err
 	return nil
 }
 
-func (importer *CompromisedPasswordsFileImporter) readDataForPrefix(prefixHex string) (string, error) {
-	masterFile, err := os.Open(importer.filename)
+// getRange retrieves the Pwned password leak record range from the data file.
+func (importer *CompromisedPasswordsFileImporter) readDataForPrefix(prefix string) (string, error) {
+	// Helper function to find the offset
+	findOffset := func(start, end int64, dataFile *os.File) int64 {
+		var mid int64
+		for start+1 < end {
+			mid = (start + end) / 2
+			dataFile.Seek(mid, 0)
+			reader := bufio.NewReader(dataFile)
+			reader.ReadString('\n') // Skip possibly partial line
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				break // EOF
+			}
+			linePrefix := line[:5]
+			if linePrefix < prefix {
+				start = mid
+			} else {
+				end = mid
+			}
+		}
+		if start != 0 {
+			return end
+		}
+		return start
+	}
+
+	// Open the data file
+	file, err := os.Open(importer.filename)
 	if err != nil {
 		return "", err
 	}
-	defer masterFile.Close()
+	defer file.Close()
 
-	reader := bufio.NewReader(masterFile)
-	start, end := int64(0), int64(0)
-	masterFile.Seek(0, io.SeekEnd)
-	end, _ = masterFile.Seek(0, io.SeekCurrent)
+	// Find start offset of the prefix
+	var startOffset int64
+	file.Seek(0, 2) // Move to end of file to get size
+	endOffset, _ := file.Seek(0, 1)
+	startOffset = findOffset(0, endOffset, file)
+	// Read and process the lines between the found offsets
+	file.Seek(startOffset, 0)
 
-	for start < end {
-		mid := (start + end) / 2
-		masterFile.Seek(mid, io.SeekStart)
-		reader.ReadString('\n') // Skip possibly partial line
-		line, err := reader.ReadString('\n')
-		if err != nil {
+	results := []string{}
+	scanner := bufio.NewScanner(file)
+	if startOffset != 0 {
+		scanner.Scan()
+	}
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, prefix) {
 			break
 		}
-		linePrefix := line[:5]
-		if linePrefix < prefixHex {
-			start = mid + 1
-		} else {
-			end = mid
-		}
+		results = append(results, strings.TrimSpace(line[5:]))
 	}
-
-	results := ""
-	masterFile.Seek(start, io.SeekStart)
-	reader.ReadString('\n') // Skip possibly partial line if not at the beginning
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil || !strings.HasPrefix(line, prefixHex) {
-			break
-		}
-		if !strings.Contains(line, ":") {
-			line = line[:len(line)-1] + ":1\n"
-		}
-		results += line[5:]
-	}
-
-	return results, nil
+	return strings.Join(results, "\n"), nil
 }

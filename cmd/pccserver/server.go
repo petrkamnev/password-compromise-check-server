@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"io"
 	"os"
@@ -23,8 +24,7 @@ var serverCmd = &cobra.Command{
 	Long:  `Run the server with specified options.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetInt("port")
-		host := "localhost"
-		addr := fmt.Sprintf("%s:%d", host, port)
+		addr := fmt.Sprintf(":%d", port)
 		mode, _ := cmd.Flags().GetString("mode")
 		//TODO: state checks (sha1, ntlm)
 		if mode == "psi" {
@@ -36,11 +36,9 @@ var serverCmd = &cobra.Command{
 			fmt.Println("Error: ")
 		}
 
-		fmt.Printf("Starting server on %s\n", addr)
+		fmt.Printf("Server started on localhost%s\n", addr)
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			fmt.Println("Error starting server:", err)
-		} else {
-			fmt.Println("Server started successfully")
 		}
 
 	},
@@ -48,7 +46,6 @@ var serverCmd = &cobra.Command{
 
 func initServerCmd() {
 	serverCmd.Flags().IntP("port", "p", 8080, "Port to run the server on")
-	serverCmd.Flags().String("host", "localhost", "Host address")
 	serverCmd.Flags().StringP("mode", "m", "hash", "Password checking mode (protocol): \"hash\", \"psi\"")
 }
 
@@ -59,7 +56,7 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 	ifModifiedSince := r.Header.Get("If-Modified-Since")
 	if mode != "ntlm" {
 		// Construct the filename based on the given prefix
-		filename := getStoragePath() + prefix + ".txt"
+		filename := filepath.Join(getStoragePath(), "sha1", prefix+".txt")
 
 		// Check if the file exists
 		_, err := os.Stat(filename)
