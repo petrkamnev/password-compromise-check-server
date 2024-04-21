@@ -13,6 +13,13 @@ var rootCmd = &cobra.Command{
 	Long:  `examples:`,
 }
 
+func init() {
+	initServerCmd()
+	initImportCmd()
+	rootCmd.AddCommand(serverCmd)
+	rootCmd.AddCommand(importCmd)
+}
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -24,7 +31,7 @@ func getStoragePath() string {
 	storagePath := os.Getenv("STORAGE_PATH")
 	if storagePath == "" {
 		// Default value if not set
-		storagePath = "./"
+		storagePath = "./storage/"
 	}
 	return storagePath
 }
