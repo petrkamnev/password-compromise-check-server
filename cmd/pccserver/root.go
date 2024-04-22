@@ -30,7 +30,7 @@ func Execute() {
 }
 
 func getStoragePath() string {
-	storagePath := os.Getenv("STORAGE_PATH")
+	storagePath := os.Getenv("PCCSERVER_STORAGE")
 	if storagePath == "" {
 		configDir, err := os.UserConfigDir()
 		if err != nil {
