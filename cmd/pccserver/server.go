@@ -33,10 +33,12 @@ var serverCmd = &cobra.Command{
 			http.HandleFunc("/range/", handleRange)
 			http.HandleFunc("/pwnedpassword/", handlePwnedPassword)
 		} else {
-			fmt.Println("Error: ")
+			fmt.Println("Error: incorrect \"mode\" option value")
 		}
 
-		fmt.Printf("Server started on localhost%s\n", addr)
+		if !quietFlag {
+			fmt.Printf("Server started on localhost%s\n", addr)
+		}
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			fmt.Println("Error starting server:", err)
 		}
@@ -145,7 +147,6 @@ func handlePwnedPassword(w http.ResponseWriter, r *http.Request) {
 	//fmt.Fprint(w, count)
 	//w.WriteHeader(http.StatusOK)
 }
-
 func handlePSI(w http.ResponseWriter, r *http.Request) {
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/psi/"))
 	mode := r.URL.Query().Get("mode")
@@ -171,24 +172,21 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 	psiRequest := &psi_proto.Request{}
 	err = proto.Unmarshal(requestBody, psiRequest)
 	if err != nil {
-		fmt.Errorf("Failed to deserialize request: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to deserialize request: %v", err), http.StatusBadRequest)
+		return
 	}
 
 	// Check if the file exists
 	_, err = os.Stat(filename)
 	if os.IsNotExist(err) {
-		// If the file doesn't exist, set the response code to 400 and write the error message to the response body
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("The hash prefix was not in a valid format"))
+		http.Error(w, "The hash prefix was not in a valid format", http.StatusBadRequest)
 		return
 	}
 
 	// Open the file
 	file, err := os.Open(filename)
 	if err != nil {
-		// If there is an error opening the file, handle it (you may choose to log the error or handle it differently)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	defer file.Close()
@@ -196,8 +194,7 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 	// Get file information
 	fileInfo, err := file.Stat()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
@@ -205,9 +202,7 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 	fileContent := make([]byte, fileSize)
 	_, err = file.Read(fileContent)
 	if err != nil {
-		// If there is an error reading the file, handle it (you may choose to log the error or handle it differently)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
@@ -225,34 +220,37 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 
 	server, err := psi_server.CreateWithNewKey(true)
 	if err != nil {
-		fmt.Errorf("Failed to create a PSI server %v", err)
+		http.Error(w, fmt.Sprintf("Failed to create a PSI server: %v", err), http.StatusInternalServerError)
+		return
 	}
 
-	// Create the setup
 	serverSetup, err := server.CreateSetupMessage(0, 1, values, psi_ds.Raw)
 	if err != nil {
-		fmt.Errorf("Failed to create serverSetup: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to create serverSetup: %v", err), http.StatusInternalServerError)
+		return
 	}
 	serializedServerSetup, err := proto.Marshal(serverSetup)
 	if err != nil {
-		fmt.Errorf("Failed to serialize serverSetup: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to serialize serverSetup: %v", err), http.StatusInternalServerError)
+		return
 	}
 
-	// Get the response
 	response, err := server.ProcessRequest(psiRequest)
 	if err != nil {
-		fmt.Errorf("Failed to process request: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to process request: %v", err), http.StatusInternalServerError)
+		return
 	}
 	serializedResponse, err := proto.Marshal(response)
 	if err != nil {
-		fmt.Errorf("Failed to serialize response: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to serialize response: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// Send the serialized response back to the client
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("PSI-Response-Length", fmt.Sprint(len(serializedResponse)))
 	w.Header().Set("PSI-Setup-Length", fmt.Sprint(len(serializedServerSetup)))
-	w.WriteHeader(http.StatusOK) // Set the response code before writing the body
+	w.WriteHeader(http.StatusOK)
 	w.Write(serializedResponse)
 	w.Write(serializedServerSetup)
 }

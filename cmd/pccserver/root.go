@@ -3,19 +3,22 @@ package main
 import (
 	"fmt"
 	"os"
-
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "pccserver",
-	Short: "pccserver is an application for deploying a HIBP-like server for checking password compromise",
-	Long:  `examples:`,
-}
+var (
+	rootCmd = &cobra.Command{
+		Use:   "pccserver",
+		Short: "pccserver is an application for deploying a HIBP-like server for checking password compromise",
+		Long:  `examples:`,
+	}
+	quietFlag bool
+)
 
 func init() {
+	rootCmd.PersistentFlags().BoolVarP(&quietFlag, "quiet", "q", false, "Suppress messages, animations, and interactivity, only display errors and important messages")
 	initServerCmd()
 	initImportCmd()
 	rootCmd.AddCommand(serverCmd)

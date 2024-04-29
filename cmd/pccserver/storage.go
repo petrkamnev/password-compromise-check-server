@@ -73,7 +73,10 @@ type CompromisedPasswordsAPIImporter struct {
 func (downloader *CompromisedPasswordsAPIImporter) downloadAllPrefixes() error {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, min(runtime.NumCPU()*8, 64))
-	bar := progressbar.Default(HIBPPrefixesCount)
+	var bar *progressbar.ProgressBar
+	if !quietFlag {
+		bar = progressbar.Default(HIBPPrefixesCount)
+	}
 	directory := filepath.Join(getStoragePath(), downloader.mode)
 	if err := os.MkdirAll(directory, 0755); err != nil {
 		return fmt.Errorf("Failed to create directory: %v", err)
@@ -95,7 +98,9 @@ func (downloader *CompromisedPasswordsAPIImporter) downloadAllPrefixes() error {
 				fmt.Printf("Error downloading for prefix %d: %v\n", prefix, err)
 				errCh <- err
 			}
-			bar.Add(1)
+			if bar != nil {
+				bar.Add(1)
+			}
 		}(i)
 	}
 
@@ -175,7 +180,10 @@ type CompromisedPasswordsFileImporter struct {
 func (importer *CompromisedPasswordsFileImporter) importAllPrefixes() error {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, min(runtime.NumCPU()*8, 64))
-	bar := progressbar.Default(HIBPPrefixesCount)
+	var bar *progressbar.ProgressBar
+	if !quietFlag {
+		bar = progressbar.Default(HIBPPrefixesCount)
+	}
 	directory := filepath.Join(getStoragePath(), importer.mode)
 	if err := os.MkdirAll(directory, 0755); err != nil {
 		return fmt.Errorf("Failed to create directory: %v", err)
