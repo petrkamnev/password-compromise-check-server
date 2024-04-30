@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/xattr"
+
 	"github.com/avast/retry-go"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
@@ -132,6 +134,10 @@ func (downloader *CompromisedPasswordsAPIImporter) downloadByPrefix(prefix int) 
 		return err
 	}
 	request.Header.Set("User-Agent", "CompromisedPasswordsImporter")
+	localETag, err := xattr.Get(filename, "user.etag")
+	if err == nil && !downloader.forceRewrite {
+		request.Header.Set("If-None-Match", string(localETag))
+	}
 	var response *http.Response
 	err = retry.Do(
 		func() error {
@@ -148,7 +154,10 @@ func (downloader *CompromisedPasswordsAPIImporter) downloadByPrefix(prefix int) 
 		return err
 	}
 	defer response.Body.Close()
-
+	if response.StatusCode == http.StatusNotModified {
+		// No update needed; local file is up-to-date
+		return nil
+	}
 	lastModifiedHeader := response.Header.Get("Last-Modified")
 	lastModifiedDate, err := time.Parse(time.RFC1123, lastModifiedHeader)
 	if err != nil {
@@ -168,6 +177,12 @@ func (downloader *CompromisedPasswordsAPIImporter) downloadByPrefix(prefix int) 
 	err = os.Chtimes(filename, lastModifiedDate, lastModifiedDate)
 	if err != nil {
 		return err
+	}
+
+	if etag := response.Header.Get("ETag"); etag != "" {
+		if err := xattr.Set(filename, "user.etag", []byte(etag)); err != nil {
+			return err
+		}
 	}
 
 	return nil

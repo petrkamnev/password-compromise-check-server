@@ -15,6 +15,7 @@ import (
 	psi_ds "github.com/openmined/psi/datastructure"
 	psi_proto "github.com/openmined/psi/pb"
 	psi_server "github.com/openmined/psi/server"
+	"github.com/pkg/xattr"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -117,9 +118,21 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if the file creation date is later than If-Modified-Since
+	// Caching
+	modified := true
 	ifModifiedSince := r.Header.Get("If-Modified-Since")
-	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() && !fileInfo.ModTime().Before(parseTime(ifModifiedSince)) {
+	etag, err := xattr.Get(filename, "user.etag")
+	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() || err == nil {
+		modified = false
+	}
+
+	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() && !fileInfo.ModTime().After(parseTime(ifModifiedSince)) {
+		modified = true
+	}
+	if err == nil && r.Header.Get("If-None-Match") == string(etag) {
+		modified = true
+	}
+	if !modified {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}

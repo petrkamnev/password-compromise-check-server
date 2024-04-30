@@ -13,6 +13,7 @@ go_library(
             "@com_github_spf13_cobra//:go_default_library",
             "@com_github_avast_retry_go//:retry-go",
             "@com_github_schollz_progressbar_v3//:progressbar",
+            "@com_github_pkg_xattr//:go_default_library"
             ],
 )
 

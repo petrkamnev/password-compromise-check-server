@@ -115,3 +115,10 @@ def go_dependencies():
         sum = "h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=",
         version = "v3.0.1",
     )
+    go_repository(
+        name = "com_github_pkg_xattr",
+        importpath = "github.com/pkg/xattr",
+        sum = "h1:5883YPCtkSd8LFbs13nXplj9g9tlrwoJRjgpgMu1/fE=",
+        version = "v0.4.9",
+    )
+    
