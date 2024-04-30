@@ -9,7 +9,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary")
 filegroup(
     name = "all_modules",
     srcs = [
-        "//cmd/CompromisedPasswordsImporter",
         "//cmd/PasswordCompromiseCheckClient",
         "//cmd/pccserver",
     ],

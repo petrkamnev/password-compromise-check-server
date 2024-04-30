@@ -50,6 +50,7 @@ var importCmd = &cobra.Command{
 			if err != nil {
 				fmt.Printf("Error downloading prefixes: %v\n", err)
 			}
+			updateStateFile(hashFunction)
 		}
 	},
 }

@@ -26,7 +26,6 @@ var serverCmd = &cobra.Command{
 		port, _ := cmd.Flags().GetInt("port")
 		addr := fmt.Sprintf(":%d", port)
 		mode, _ := cmd.Flags().GetString("mode")
-		//TODO: state checks (sha1, ntlm)
 		if mode == "psi" {
 			http.HandleFunc("/psi/", handlePSI)
 		} else if mode == "hash" {
@@ -34,15 +33,21 @@ var serverCmd = &cobra.Command{
 			http.HandleFunc("/pwnedpassword/", handlePwnedPassword)
 		} else {
 			fmt.Println("Error: incorrect \"mode\" option value")
+			return
+		}
+
+		supportedHashFunctions, err := getSupportedHashFunctions()
+		if err != nil || len(supportedHashFunctions) == 0 {
+			fmt.Printf("Error: No hash functions are imported or unable to read state: %v\n", err)
+			return
 		}
 
 		if !quietFlag {
-			fmt.Printf("Server started on localhost%s\n", addr)
+			fmt.Printf("Server started on localhost%s\nSupported hash functions: %v\n", addr, supportedHashFunctions)
 		}
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			fmt.Println("Error starting server:", err)
 		}
-
 	},
 }
 
@@ -54,20 +59,39 @@ func initServerCmd() {
 func handleRange(w http.ResponseWriter, r *http.Request) {
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/range/"))
 	mode := r.URL.Query().Get("mode")
-	var folderPath string
-
-	// Determine the storage subdirectory based on the mode parameter
-	if mode == "ntlm" {
-		folderPath = "ntlm"
-	} else {
-		folderPath = "sha1"
+	if mode != "ntlm" {
+		mode = "sha1" // Default to sha1 if the mode is not explicitly set to ntlm
 	}
+
+	// Check if the requested mode is supported
+	supportedHashFunctions, err := getSupportedHashFunctions()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error checking supported hash functions"))
+		return
+	}
+
+	isSupported := false
+	for _, m := range supportedHashFunctions {
+		if m == mode {
+			isSupported = true
+			break
+		}
+	}
+
+	if !isSupported {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Requested hash function '%s' is not supported", mode)))
+		return
+	}
+
+	folderPath := mode
 
 	// Construct the filename based on the given prefix
 	filename := filepath.Join(getStoragePath(), folderPath, prefix+".txt")
 
 	// Check if the file exists
-	_, err := os.Stat(filename)
+	_, err = os.Stat(filename)
 	if os.IsNotExist(err) {
 		// If the file doesn't exist, set the response code to 400 and write the error message to the response body
 		w.WriteHeader(http.StatusBadRequest)
@@ -132,6 +156,32 @@ func parseTime(value string) time.Time {
 }
 
 func handlePwnedPassword(w http.ResponseWriter, r *http.Request) {
+	mode := r.URL.Query().Get("mode")
+	if mode != "ntlm" {
+		mode = "sha1" // Default to sha1 if the mode is not explicitly set to ntlm
+	}
+
+	// Check if the requested mode is supported
+	supportedHashFunctions, err := getSupportedHashFunctions()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error checking supported hash functions"))
+		return
+	}
+
+	isSupported := false
+	for _, m := range supportedHashFunctions {
+		if m == mode {
+			isSupported = true
+			break
+		}
+	}
+
+	if !isSupported {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Requested hash function '%s' is not supported", mode)))
+		return
+	}
 	//hashValue := strings.TrimPrefix(r.URL.Path, "/pwnedpassword/")
 	//count, err := getCount(hashValue)
 	//if err != nil {
@@ -150,7 +200,32 @@ func handlePwnedPassword(w http.ResponseWriter, r *http.Request) {
 func handlePSI(w http.ResponseWriter, r *http.Request) {
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/psi/"))
 	mode := r.URL.Query().Get("mode")
-	var folderPath string
+	if mode != "ntlm" {
+		mode = "sha1" // Default to sha1 if the mode is not explicitly set to ntlm
+	}
+
+	// Check if the requested mode is supported
+	supportedHashFunctions, err := getSupportedHashFunctions()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error checking supported hash functions"))
+		return
+	}
+
+	isSupported := false
+	for _, m := range supportedHashFunctions {
+		if m == mode {
+			isSupported = true
+			break
+		}
+	}
+
+	if !isSupported {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Requested hash function '%s' is not supported", mode)))
+		return
+	}
+	folderPath := mode
 
 	// Determine the storage subdirectory based on the mode parameter
 	if mode == "ntlm" {
