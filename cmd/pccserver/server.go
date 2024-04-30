@@ -60,7 +60,7 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/range/"))
 	mode := r.URL.Query().Get("mode")
 	if mode != "ntlm" {
-		mode = "sha1" // Default to sha1 if the mode is not explicitly set to ntlm
+		mode = "sha1"
 	}
 
 	// Check if the requested mode is supported
@@ -158,7 +158,7 @@ func parseTime(value string) time.Time {
 func handlePwnedPassword(w http.ResponseWriter, r *http.Request) {
 	mode := r.URL.Query().Get("mode")
 	if mode != "ntlm" {
-		mode = "sha1" // Default to sha1 if the mode is not explicitly set to ntlm
+		mode = "sha1"
 	}
 
 	// Check if the requested mode is supported
@@ -201,7 +201,7 @@ func handlePSI(w http.ResponseWriter, r *http.Request) {
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/psi/"))
 	mode := r.URL.Query().Get("mode")
 	if mode != "ntlm" {
-		mode = "sha1" // Default to sha1 if the mode is not explicitly set to ntlm
+		mode = "sha1"
 	}
 
 	// Check if the requested mode is supported
