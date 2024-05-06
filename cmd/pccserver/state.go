@@ -5,7 +5,49 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
 )
+
+var outputStateCmd = &cobra.Command{
+	Use:   "output-state",
+	Short: "Outputs information about the current state of the compromised passwords storage",
+	Run: func(cmd *cobra.Command, args []string) {
+		jsonMode, _ := cmd.Flags().GetBool("json")
+		outputState(jsonMode)
+	},
+}
+
+func initOutputStateCmd() {
+	outputStateCmd.Flags().Bool("json", false, "Output in JSON format")
+}
+
+func outputState(jsonMode bool) {
+	state, err := getState()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if jsonMode {
+		data, err := json.Marshal(state)
+		if err != nil {
+			fmt.Println("Error marshalling state:", err)
+			return
+		}
+		fmt.Println(string(data))
+	} else {
+		fmt.Printf("Supported Hash Functions: %v\n", state.SupportedHashFunctions)
+	}
+}
+
+func getState() (*State, error) {
+	state, err := readStateFile()
+	if err != nil {
+		return nil, fmt.Errorf("Error retrieving state: %v", err)
+	}
+	return state, nil
+}
 
 type State struct {
 	SupportedHashFunctions []string `json:"supported_hash_functions"`
