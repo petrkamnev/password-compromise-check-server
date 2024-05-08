@@ -138,6 +138,16 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set Last-Modified header using the file's modification date, if it exists
+	if !fileInfo.ModTime().IsZero() {
+		w.Header().Set("Last-Modified", fileInfo.ModTime().UTC().Format(http.TimeFormat))
+	}
+
+	// Set ETag header, if the ETag exists
+	if err == nil {
+		w.Header().Set("ETag", string(etag))
+	}
+
 	fileSize := fileInfo.Size()
 	fileContent := make([]byte, fileSize)
 	_, err = file.Read(fileContent)
@@ -147,9 +157,6 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Internal Server Error"))
 		return
 	}
-
-	// Set Last-Modified header using the file creation date
-	w.Header().Set("Last-Modified", fileInfo.ModTime().UTC().Format(http.TimeFormat))
 
 	// Set the response code to 200
 	w.WriteHeader(http.StatusOK)
