@@ -328,3 +328,100 @@ func (importer *CompromisedPasswordsFileImporter) readDataForPrefix(prefix strin
 	}
 	return strings.Join(results, "\n"), nil
 }
+
+var exportCmd = &cobra.Command{
+	Use:   "export-values",
+	Short: "Export compromised passwords",
+	Long:  `Export compromised passwords by validating them with a specified hash function and saving the hash values to a file.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		mode, _ := cmd.Flags().GetString("mode")
+		if mode != "sha1" && mode != "ntlm" {
+			fmt.Printf("Error: incorrect \"mode\" parameter value. Allowed values: \"sha1\", \"ntlm\"\n")
+			return
+		}
+		filePath, _ := cmd.Flags().GetString("file")
+		if filePath == "" {
+			fmt.Println("Error: file path must be specified with -f or --file")
+			return
+		}
+		err := exportHashValues(mode, filePath)
+		if err != nil {
+			fmt.Printf("Error exporting hash values: %v\n", err)
+			return
+		}
+	},
+}
+
+func initExportCmd() {
+	exportCmd.Flags().StringP("mode", "m", "sha1", "Hash function to validate (SHA-1 or NTLM)")
+	exportCmd.Flags().StringP("file", "f", "", "Path to the file for saving hash values")
+}
+
+func exportHashValues(mode, filePath string) error {
+	// Check if the requested mode is supported
+	supportedHashFunctions, err := getSupportedHashFunctions()
+	if err != nil {
+		return fmt.Errorf("error checking supported hash functions: %w", err)
+	}
+
+	isSupported := false
+	for _, m := range supportedHashFunctions {
+		if m == mode {
+			isSupported = true
+			break
+		}
+	}
+
+	if !isSupported {
+		return fmt.Errorf("unsupported hash function: %s", mode)
+	}
+
+	// Open the file to write the hash values
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %v", err)
+	}
+	defer file.Close()
+
+	// Iterate over all possible prefixes
+	for i := 0; i <= 0xFFFFF; i++ { // Hexadecimal range from 0x00000 to 0xFFFFF
+		prefix := fmt.Sprintf("%05X", i)
+		data, err := fetchHashData(prefix, mode)
+		if err != nil {
+			return err
+		}
+		_, err = file.WriteString(data + "\n")
+		if err != nil {
+			return fmt.Errorf("failed to write to file: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func fetchHashData(prefix, mode string) (string, error) {
+	folderPath := mode
+	filename := filepath.Join(getStoragePath(), folderPath, prefix+".txt")
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var result strings.Builder
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != "" {
+			// Append the prefix and the line content
+			result.WriteString(fmt.Sprintf("%s%s\n", prefix, line))
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading file: %v", err)
+	}
+
+	return result.String(), nil
+}
