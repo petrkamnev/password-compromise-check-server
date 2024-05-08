@@ -121,15 +121,16 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 	// Caching
 	modified := true
 	ifModifiedSince := r.Header.Get("If-Modified-Since")
+	ifNoneMatch := r.Header.Get("If-None-Match")
 	etag, err := xattr.Get(filename, "user.etag")
-	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() || err == nil {
+	if (ifModifiedSince != "" && !fileInfo.ModTime().IsZero()) || (err == nil && ifNoneMatch != "") {
 		modified = false
 	}
 
 	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() && !fileInfo.ModTime().After(parseTime(ifModifiedSince)) {
 		modified = true
 	}
-	if err == nil && r.Header.Get("If-None-Match") == string(etag) {
+	if err == nil && ifNoneMatch != "" && ifNoneMatch != string(etag) {
 		modified = true
 	}
 	if !modified {
