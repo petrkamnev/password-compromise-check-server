@@ -53,8 +53,9 @@ var importCmd = &cobra.Command{
 			err := cpi.importAllPrefixes()
 			if err != nil {
 				fmt.Printf("Error downloading prefixes: %v\n", err)
+			} else {
+				updateStateFile(hashFunction)
 			}
-			updateStateFile(hashFunction)
 		}
 	},
 }
