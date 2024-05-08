@@ -332,7 +332,7 @@ func (importer *CompromisedPasswordsFileImporter) readDataForPrefix(prefix strin
 var exportCmd = &cobra.Command{
 	Use:   "export-values",
 	Short: "Export compromised passwords",
-	Long:  `Export compromised passwords by validating them with a specified hash function and saving the hash values to a file.`,
+	Long:  `Export compromised passwords to a file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mode, _ := cmd.Flags().GetString("mode")
 		if mode != "sha1" && mode != "ntlm" {
