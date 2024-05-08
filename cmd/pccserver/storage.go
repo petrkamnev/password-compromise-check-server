@@ -43,6 +43,8 @@ var importCmd = &cobra.Command{
 			err := cpd.downloadAllPrefixes()
 			if err != nil {
 				fmt.Printf("Error downloading prefixes: %v\n", err)
+			} else {
+				updateStateFile(hashFunction)
 			}
 		} else {
 			var cpi CompromisedPasswordsFileImporter
