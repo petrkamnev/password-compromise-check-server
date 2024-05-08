@@ -127,7 +127,7 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		modified = false
 	}
 
-	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() && !fileInfo.ModTime().After(parseTime(ifModifiedSince)) {
+	if ifModifiedSince != "" && !fileInfo.ModTime().IsZero() && fileInfo.ModTime().After(parseTime(ifModifiedSince)) {
 		modified = true
 	}
 	if err == nil && ifNoneMatch != "" && ifNoneMatch != string(etag) {
