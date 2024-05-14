@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 
 	"io"
 	"os"
@@ -203,21 +205,73 @@ func handlePwnedPassword(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf("Requested hash function '%s' is not supported", mode)))
 		return
 	}
-	//hashValue := strings.TrimPrefix(r.URL.Path, "/pwnedpassword/")
-	//count, err := getCount(hashValue)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusInternalServerError)
-	//	return
-	//}
 
-	//if count == 0 {
-	//	http.NotFound(w, r)
-	//	return
-	//}
+	// Extract the hash value from the URL
+	hashValue := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/pwnedpassword/"))
 
-	//fmt.Fprint(w, count)
-	//w.WriteHeader(http.StatusOK)
+	// Validate the hash format
+	if (mode == "sha1" && len(hashValue) != 40) || (mode == "ntlm" && len(hashValue) != 32) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("The hash was not in a valid format"))
+		return
+	}
+
+	// Extract prefix and suffix
+	prefix := hashValue[:5]
+	suffix := hashValue[5:]
+
+	// Construct the filename based on the given prefix
+	filename := filepath.Join(getStoragePath(), mode, prefix+".txt")
+
+	// Check if the file exists
+	_, err = os.Stat(filename)
+	if os.IsNotExist(err) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Open the file
+	file, err := os.Open(filename)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error"))
+		return
+	}
+	defer file.Close()
+
+	// Read the file line by line and check for the suffix
+	var count int
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, suffix) {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				count, err = strconv.Atoi(parts[1])
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Internal Server Error"))
+					return
+				}
+				break
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal Server Error"))
+		return
+	}
+
+	if count == 0 {
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, count)
+	}
 }
+
 func handlePSI(w http.ResponseWriter, r *http.Request) {
 	prefix := strings.ToUpper(strings.TrimPrefix(r.URL.Path, "/psi/"))
 	mode := r.URL.Query().Get("mode")
