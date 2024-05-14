@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -150,21 +151,68 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", string(etag))
 	}
 
-	fileSize := fileInfo.Size()
-	fileContent := make([]byte, fileSize)
-	_, err = file.Read(fileContent)
-	if err != nil {
-		// If there is an error reading the file, handle it (you may choose to log the error or handle it differently)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
-		return
+	// Handle Add-Padding header
+	addPadding := r.Header.Get("Add-Padding") == "true"
+	var responseContent string
+
+	if !addPadding {
+		fileSize := fileInfo.Size()
+		fileContent := make([]byte, fileSize)
+		_, err = file.Read(fileContent)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal Server Error"))
+			return
+		}
+		responseContent = string(fileContent)
+	} else {
+		scanner := bufio.NewScanner(file)
+		lineCount := 0
+		for scanner.Scan() {
+			lineCount++
+		}
+		if err := scanner.Err(); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal Server Error"))
+			return
+		}
+
+		// Generate dummy lines if necessary
+		if lineCount < 800 {
+			numDummyLines := 800 + rand.Intn(201) - lineCount
+			dummyLines := make([]string, numDummyLines)
+			for i := 0; i < numDummyLines; i++ {
+				dummySuffix := fmt.Sprintf("%035d", i) // Adjust dummy suffix format as needed
+				dummyLines[i] = dummySuffix + ":0"
+			}
+
+			// Read the file content again and append dummy lines
+			file.Seek(0, 0)
+			fileContent, err := io.ReadAll(file)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Internal Server Error"))
+				return
+			}
+			responseContent = string(fileContent) + "\n" + strings.Join(dummyLines, "\n")
+		} else {
+			// Read the file content directly if no padding is needed
+			file.Seek(0, 0)
+			fileContent, err := io.ReadAll(file)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Internal Server Error"))
+				return
+			}
+			responseContent = string(fileContent)
+		}
 	}
 
 	// Set the response code to 200
 	w.WriteHeader(http.StatusOK)
 
-	// Write the file content to the response body
-	w.Write(fileContent)
+	// Write the response content to the response body
+	w.Write([]byte(responseContent))
 }
 
 func parseTime(value string) time.Time {
