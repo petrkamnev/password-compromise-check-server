@@ -19,6 +19,7 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&quietFlag, "quiet", "q", false, "Suppress messages, animations, and interactivity, only display errors and important messages")
+	rootCmd.Root().CompletionOptions.DisableDefaultCmd = true
 	initServerCmd()
 	initImportCmd()
 	initExportCmd()
