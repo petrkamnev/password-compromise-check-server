@@ -334,9 +334,9 @@ var exportCmd = &cobra.Command{
 	Short: "Export compromised passwords",
 	Long:  `Export compromised passwords to a file.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		mode, _ := cmd.Flags().GetString("mode")
+		mode, _ := cmd.Flags().GetString("hash-function")
 		if mode != "sha1" && mode != "ntlm" {
-			fmt.Printf("Error: incorrect \"mode\" parameter value. Allowed values: \"sha1\", \"ntlm\"\n")
+			fmt.Printf("Error: incorrect \"hash-function\" parameter value. Allowed values: \"sha1\", \"ntlm\"\n")
 			return
 		}
 		filePath, _ := cmd.Flags().GetString("file")
@@ -353,7 +353,7 @@ var exportCmd = &cobra.Command{
 }
 
 func initExportCmd() {
-	exportCmd.Flags().StringP("mode", "m", "sha1", "Hash function to validate (SHA-1 or NTLM)")
+	exportCmd.Flags().String("hash-function", "sha1", "Hash function to validate (SHA-1 or NTLM)")
 	exportCmd.Flags().StringP("file", "f", "", "Path to the file for saving hash values")
 }
 
