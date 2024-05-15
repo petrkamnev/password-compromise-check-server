@@ -182,7 +182,12 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 			numDummyLines := 1300 + rand.Intn(201) - lineCount
 			dummyLines := make([]string, numDummyLines)
 			for i := 0; i < numDummyLines; i++ {
-				dummySuffix := fmt.Sprintf("%035d", i) // Adjust dummy suffix format as needed
+				var dummySuffix string
+				if mode == "ntlm" {
+					dummySuffix = fmt.Sprintf("%027d", 0)
+				} else {
+					dummySuffix = fmt.Sprintf("%035d", 0)
+				}
 				dummyLines[i] = dummySuffix + ":0"
 			}
 
