@@ -178,8 +178,8 @@ func handleRange(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Generate dummy lines if necessary
-		if lineCount < 800 {
-			numDummyLines := 800 + rand.Intn(201) - lineCount
+		if lineCount < 1300 {
+			numDummyLines := 1300 + rand.Intn(201) - lineCount
 			dummyLines := make([]string, numDummyLines)
 			for i := 0; i < numDummyLines; i++ {
 				dummySuffix := fmt.Sprintf("%035d", i) // Adjust dummy suffix format as needed
