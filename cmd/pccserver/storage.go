@@ -383,6 +383,11 @@ func exportHashValues(mode, filePath string) error {
 	}
 	defer file.Close()
 
+	var bar *progressbar.ProgressBar
+	if !quietFlag {
+		bar = progressbar.Default(HIBPPrefixesCount)
+	}
+
 	// Iterate over all possible prefixes
 	for i := 0; i <= 0xFFFFF; i++ { // Hexadecimal range from 0x00000 to 0xFFFFF
 		prefix := fmt.Sprintf("%05X", i)
@@ -393,6 +398,9 @@ func exportHashValues(mode, filePath string) error {
 		_, err = file.WriteString(data + "\n")
 		if err != nil {
 			return fmt.Errorf("failed to write to file: %v", err)
+		}
+		if bar != nil {
+			bar.Add(1)
 		}
 	}
 
