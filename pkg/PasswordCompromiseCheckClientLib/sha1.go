@@ -62,6 +62,10 @@ func CheckSHA1PSIPassword(password string, url string) (bool, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("Received non-200 response status: %d %s", response.StatusCode, response.Status)
+	}
+
 	psiResponseLengthHeader := response.Header.Get("PSI-Response-Length")
 	psiSetupLengthHeader := response.Header.Get("PSI-Setup-Length")
 
